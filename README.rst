@@ -18,9 +18,11 @@ PyOpenCL: Pythonic Access to OpenCL, with Arrays and Algorithms
 
 ## Build Wheel
 
-```bash
+```
 python3 configure.py
+
 nano siteconf.py # Add CUDA and other config
+
 python3 setup.py bdist_wheel --universal
 ```
 
