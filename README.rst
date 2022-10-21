@@ -14,6 +14,18 @@ PyOpenCL: Pythonic Access to OpenCL, with Arrays and Algorithms
     :alt: Zenodo DOI for latest release
     :target: https://zenodo.org/badge/latestdoi/1575307
 
+
+
+## Build Wheel
+
+```bash
+python3 configure.py
+nano siteconf.py # Add CUDA and other config
+python3 setup.py bdist_wheel --universal
+```
+
+
+
 PyOpenCL lets you access GPUs and other massively parallel compute
 devices from Python. It tries to offer computing goodness in the
 spirit of its sister project `PyCUDA <https://mathema.tician.de/software/pycuda>`_:
