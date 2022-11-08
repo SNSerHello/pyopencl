@@ -77,6 +77,13 @@
     ; \
   } \
   \
+  inline TP TPROOT##_fma(TP a, TP b, TP c)           \
+  { \
+    return TPROOT##_new( \
+        fma(a.real, b.real, c.real) - a.imag*b.imag, \
+        fma(a.imag, b.real, fma(a.real, b.imag, c.imag))); \
+  } \
+  \
   inline TP TPROOT##_mul(TP a, TP b)            \
   { \
     return TPROOT##_new( \

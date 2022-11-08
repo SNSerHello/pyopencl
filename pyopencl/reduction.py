@@ -1,6 +1,5 @@
 """Computation of reductions on vectors."""
 
-
 __copyright__ = "Copyright (C) 2010 Andreas Kloeckner"
 
 __license__ = """
@@ -30,13 +29,13 @@ None of the original source code remains.
 """
 
 from dataclasses import dataclass
-from typing import List
+from typing import Any, List, Optional, Tuple, Union
 
 import numpy as np
 
 import pyopencl as cl
 from pyopencl.tools import (
-        Argument, KernelTemplateBase,
+        DtypedArgument, KernelTemplateBase,
         context_dependent_memoize, dtype_to_ctype,
         _process_code_for_macro)
 
@@ -131,14 +130,22 @@ class _ReductionInfo:
 
     program: cl.Program
     kernel: cl.Kernel
-    arg_types: List[Argument]
+    arg_types: List[DtypedArgument]
 
 
 def _get_reduction_source(
-        ctx, out_type, out_type_size,
-        neutral, reduce_expr, map_expr, parsed_args,
-        name="reduce_kernel", preamble="", arg_prep="",
-        device=None, max_group_size=None):
+        ctx: cl.Context,
+        out_type: str,
+        out_type_size: int,
+        neutral: str,
+        reduce_expr: str,
+        map_expr: str,
+        parsed_args: List[DtypedArgument],
+        name: str = "reduce_kernel",
+        preamble: str = "",
+        arg_prep: str = "",
+        device: Optional[cl.Device] = None,
+        max_group_size: Optional[int] = None) -> Tuple[str, int]:
 
     if device is not None:
         devices = [device]
@@ -147,7 +154,7 @@ def _get_reduction_source(
 
     # {{{ compute group size
 
-    def get_dev_group_size(device):
+    def get_dev_group_size(device: cl.Device) -> int:
         # dirty fix for the RV770 boards
         max_work_group_size = device.max_work_group_size
         if "RV770" in device.name:
@@ -192,17 +199,24 @@ def _get_reduction_source(
     return src, group_size
 
 
-def get_reduction_kernel(stage,
-         ctx, dtype_out,
-         neutral, reduce_expr, map_expr=None, arguments=None,
-         name="reduce_kernel", preamble="",
-         device=None, options=None, max_group_size=None):
+def get_reduction_kernel(
+        stage: int,
+        ctx: cl.Context,
+        dtype_out: Any,
+        neutral: str,
+        reduce_expr: str,
+        map_expr: Optional[str] = None,
+        arguments: Optional[List[DtypedArgument]] = None,
+        name: str = "reduce_kernel",
+        preamble: str = "",
+        device: Optional[cl.Device] = None,
+        options: Any = None,
+        max_group_size: Optional[int] = None) -> _ReductionInfo:
+    if stage not in (1, 2):
+        raise ValueError(f"unknown stage index: '{stage}'")
 
     if map_expr is None:
-        if stage == 2:
-            map_expr = "pyopencl_reduction_inp[i]"
-        else:
-            map_expr = "in[i]"
+        map_expr = "pyopencl_reduction_inp[i]" if stage == 2 else "in[i]"
 
     from pyopencl.tools import (
             parse_arg_list, get_arg_list_scalar_arg_dtypes,
@@ -249,10 +263,52 @@ def get_reduction_kernel(stage,
 
 # {{{ main reduction kernel
 
+_MAX_GROUP_COUNT = 1024
+_SMALL_SEQ_COUNT = 4
+
+
 class ReductionKernel:
-    def __init__(self, ctx, dtype_out,
-            neutral, reduce_expr, map_expr=None, arguments=None,
-            name="reduce_kernel", options=None, preamble=""):
+    """A kernel that performs a generic reduction on arrays.
+
+    Generate a kernel that takes a number of scalar or vector *arguments*
+    (at least one vector argument), performs the *map_expr* on each entry of
+    the vector argument and then the *reduce_expr* on the outcome of that.
+    *neutral* serves as an initial value. *preamble* offers the possibility
+    to add preprocessor directives and other code (such as helper functions)
+    to be added before the actual reduction kernel code.
+
+    Vectors in *map_expr* should be indexed by the variable *i*. *reduce_expr*
+    uses the formal values "a" and "b" to indicate two operands of a binary
+    reduction operation. If you do not specify a *map_expr*, ``in[i]`` is
+    automatically assumed and treated as the only one input argument.
+
+    *dtype_out* specifies the :class:`numpy.dtype` in which the reduction is
+    performed and in which the result is returned. *neutral* is specified as
+    float or integer formatted as string. *reduce_expr* and *map_expr* are
+    specified as string formatted operations and *arguments* is specified as a
+    string formatted as a C argument list. *name* specifies the name as which
+    the kernel is compiled. *options* are passed unmodified to
+    :meth:`pyopencl.Program.build`. *preamble* specifies a string of code that
+    is inserted before the actual kernels.
+
+    .. automethod:: __init__
+    .. automethod:: __call__
+    """
+
+    def __init__(
+            self,
+            ctx: cl.Context,
+            dtype_out: Any,
+            neutral: str,
+            reduce_expr: str,
+            map_expr: Optional[str] = None,
+            arguments: Optional[Union[str, List[DtypedArgument]]] = None,
+            name: str = "reduce_kernel",
+            options: Any = None,
+            preamble: str = "") -> None:
+        if arguments is None:
+            raise ValueError("arguments must not be None")
+
         from pyopencl.tools import parse_arg_list
         arguments = parse_arg_list(arguments, with_offset=True)
 
@@ -265,7 +321,7 @@ class ReductionKernel:
             self.stage_1_inf = get_reduction_kernel(1, ctx,
                     dtype_out,
                     neutral, reduce_expr, map_expr, arguments,
-                    name=name+"_stage1", options=options, preamble=preamble,
+                    name=f"{name}_stage1", options=options, preamble=preamble,
                     max_group_size=max_group_size)
 
             kernel_max_wg_size = self.stage_1_inf.kernel.get_work_group_info(
@@ -283,11 +339,33 @@ class ReductionKernel:
         self.stage_2_inf = get_reduction_kernel(2, ctx,
                 dtype_out,
                 neutral, reduce_expr, arguments=arguments,
-                name=name+"_stage2", options=options, preamble=preamble,
+                name=f"{name}_stage2", options=options, preamble=preamble,
                 max_group_size=max_group_size)
 
-    def __call__(self, *args, **kwargs):
-        """
+    def __call__(self, *args: Any, **kwargs: Any) -> cl.Event:
+        """Invoke the generated kernel.
+
+        |explain-waitfor|
+
+        With *out* the resulting single-entry :class:`pyopencl.array.Array` can
+        be specified. Because offsets are supported one can store results
+        anywhere (e.g. ``out=a[3]``).
+
+        .. note::
+
+            The returned :class:`pyopencl.Event` corresponds only to part of the
+            execution of the reduction. It is not suitable for profiling.
+
+        .. versionadded:: 2011.1
+
+        .. versionchanged:: 2014.2
+
+            Added *out* parameter.
+
+        .. versionchanged:: 2016.2
+
+            *range_* and *slice_* added.
+
         :arg range: A :class:`slice` object. Specifies the range of indices on which
             the kernel will be executed. May not be given at the same time
             as *slice*.
@@ -295,16 +373,13 @@ class ReductionKernel:
             Specifies the range of indices on which the kernel will be
             executed, relative to the first vector-like argument.
             May not be given at the same time as *range*.
-        :arg allocator:
+        :arg return_event: a boolean flag used to return an event for the
+            reduction.
 
-        .. versionchanged:: 2016.2
-
-            *range_* and *slice_* added.
+        :return: the resulting scalar as a single-entry :class:`pyopencl.array.Array`
+            if *return_event* is *False*, otherwise a tuple
+            ``(scalar_array, event)``.
         """
-        MAX_GROUP_COUNT = 1024  # noqa
-        SMALL_SEQ_COUNT = 4  # noqa
-
-        stage_inf = self.stage_1_inf
 
         queue = kwargs.pop("queue", None)
         allocator = kwargs.pop("allocator", None)
@@ -312,21 +387,22 @@ class ReductionKernel:
         return_event = kwargs.pop("return_event", False)
         out = kwargs.pop("out", None)
 
-        if wait_for is None:
-            wait_for = []
-        else:
-            # We'll be modifying it below.
-            wait_for = list(wait_for)
-
         range_ = kwargs.pop("range", None)
         slice_ = kwargs.pop("slice", None)
 
         if kwargs:
             raise TypeError("invalid keyword argument to reduction kernel")
 
-        stage1_args = args
+        if wait_for is None:
+            wait_for = []
+        else:
+            # We'll be modifying it below.
+            wait_for = list(wait_for)
 
         from pyopencl.array import empty
+
+        stage_inf = self.stage_1_inf
+        stage1_args = args
 
         while True:
             invocation_args = []
@@ -339,8 +415,9 @@ class ReductionKernel:
                 if isinstance(arg_tp, VectorArg):
                     array_empty = arg.__class__
                     if not arg.flags.forc:
-                        raise RuntimeError("ReductionKernel cannot "
-                                "deal with non-contiguous arrays")
+                        raise RuntimeError(
+                            f"{type(self).__name__} cannot deal with "
+                            "non-contiguous arrays")
 
                     vectors.append(arg)
                     invocation_args.append(arg.base_data)
@@ -390,8 +467,8 @@ class ReductionKernel:
             else:
                 if repr_vec is None:
                     raise TypeError(
-                            "must specify queue argument when no vector argument "
-                            "present")
+                        "must specify queue argument when no vector argument present"
+                        )
 
                 use_queue = repr_vec.queue
 
@@ -408,13 +485,13 @@ class ReductionKernel:
                 group_count = 1
                 seq_count = 0
 
-            elif sz <= stage_inf.group_size*SMALL_SEQ_COUNT*MAX_GROUP_COUNT:
-                total_group_size = SMALL_SEQ_COUNT*stage_inf.group_size
+            elif sz <= stage_inf.group_size*_SMALL_SEQ_COUNT*_MAX_GROUP_COUNT:
+                total_group_size = _SMALL_SEQ_COUNT*stage_inf.group_size
                 group_count = (sz + total_group_size - 1) // total_group_size
-                seq_count = SMALL_SEQ_COUNT
+                seq_count = _SMALL_SEQ_COUNT
 
             else:
-                group_count = MAX_GROUP_COUNT
+                group_count = _MAX_GROUP_COUNT
                 macrogroup_size = group_count*stage_inf.group_size
                 seq_count = (sz + macrogroup_size - 1) // macrogroup_size
 
@@ -459,16 +536,22 @@ class ReductionKernel:
 # {{{ template
 
 class ReductionTemplate(KernelTemplateBase):
-    def __init__(self,
-            arguments, neutral, reduce_expr, map_expr=None,
-            is_segment_start_expr=None, input_fetch_exprs=None,
-            name_prefix="reduce", preamble="", template_processor=None):
+    def __init__(
+            self,
+            arguments: Union[str, List[DtypedArgument]],
+            neutral: str,
+            reduce_expr: str,
+            map_expr: Optional[str] = None,
+            is_segment_start_expr: Optional[str] = None,
+            input_fetch_exprs: Optional[List[Tuple[str, str, int]]] = None,
+            name_prefix: str = "reduce",
+            preamble: str = "",
+            template_processor: Any = None) -> None:
+        super().__init__(template_processor=template_processor)
 
         if input_fetch_exprs is None:
             input_fetch_exprs = []
 
-        KernelTemplateBase.__init__(
-                self, template_processor=template_processor)
         self.arguments = arguments
         self.reduce_expr = reduce_expr
         self.neutral = neutral
@@ -496,7 +579,7 @@ class ReductionTemplate(KernelTemplateBase):
                 preamble=(
                     type_decl_preamble
                     + "\n"
-                    + renderer(self.preamble + "\n" + more_preamble)))
+                    + renderer(f"{self.preamble}\n{more_preamble}")))
 
 # }}}
 
@@ -529,12 +612,13 @@ def get_sum_kernel(ctx, dtype_out, dtype_in):
     if dtype_out.kind == "c":
         from pyopencl.elementwise import complex_dtype_to_name
         dtname = complex_dtype_to_name(dtype_out)
-        reduce_expr = "%s_add(a, b)" % dtname
-        neutral_expr = "%s_new(0, 0)" % dtname
+        reduce_expr = f"{dtname}_add(a, b)"
+        neutral_expr = f"{dtname}_new(0, 0)"
 
-    return ReductionKernel(ctx, dtype_out, neutral_expr, reduce_expr,
-            arguments="const %(tp)s *in"
-            % {"tp": dtype_to_ctype(dtype_in)})
+    return ReductionKernel(
+            ctx, dtype_out, neutral_expr, reduce_expr,
+            arguments="const {} *in".format(dtype_to_ctype(dtype_in)),
+            )
 
 
 def _get_dot_expr(dtype_out, dtype_a, dtype_b, conjugate_first,
@@ -556,8 +640,8 @@ def _get_dot_expr(dtype_out, dtype_a, dtype_b, conjugate_first,
 
     from pyopencl.elementwise import complex_dtype_to_name
 
-    a = "a[%s]" % index_expr
-    b = "b[%s]" % index_expr
+    a = f"a[{index_expr}]"
+    b = f"b[{index_expr}]"
 
     if a_is_complex and (dtype_a != dtype_out):
         a = "{}_cast({})".format(complex_dtype_to_name(dtype_out), a)
@@ -593,17 +677,17 @@ def get_dot_kernel(ctx, dtype_out, dtype_a=None, dtype_b=None,
     if dtype_out.kind == "c":
         from pyopencl.elementwise import complex_dtype_to_name
         dtname = complex_dtype_to_name(dtype_out)
-        reduce_expr = "%s_add(a, b)" % dtname
-        neutral_expr = "%s_new(0, 0)" % dtname
+        reduce_expr = f"{dtname}_add(a, b)"
+        neutral_expr = f"{dtname}_new(0, 0)"
 
     return ReductionKernel(ctx, dtype_out, neutral=neutral_expr,
             reduce_expr=reduce_expr, map_expr=map_expr,
             arguments=(
-                "const %(tp_a)s *a, "
-                "const %(tp_b)s *b" % {
-                    "tp_a": dtype_to_ctype(dtype_a),
-                    "tp_b": dtype_to_ctype(dtype_b),
-                    }))
+                "const {tp_a} *a, const {tp_b} *b".format(
+                    tp_a=dtype_to_ctype(dtype_a),
+                    tp_b=dtype_to_ctype(dtype_b),
+                    ))
+            )
 
 
 @context_dependent_memoize
@@ -619,13 +703,13 @@ def get_subset_dot_kernel(ctx, dtype_out, dtype_subset, dtype_a=None, dtype_b=No
     return ReductionKernel(ctx, dtype_out, neutral="0",
             reduce_expr="a+b", map_expr=map_expr,
             arguments=(
-                "const %(tp_lut)s *lookup_tbl, "
-                "const %(tp_a)s *a, "
-                "const %(tp_b)s *b" % {
-                    "tp_lut": dtype_to_ctype(dtype_subset),
-                    "tp_a": dtype_to_ctype(dtype_a),
-                    "tp_b": dtype_to_ctype(dtype_b),
-                    }))
+                "const {tp_lut} *lookup_tbl, const {tp_a} *a, const {tp_b} *b"
+                .format(
+                    tp_lut=dtype_to_ctype(dtype_subset),
+                    tp_a=dtype_to_ctype(dtype_a),
+                    tp_b=dtype_to_ctype(dtype_b),
+                    ))
+            )
 
 
 _MINMAX_PREAMBLE = """
@@ -656,9 +740,9 @@ def get_minmax_neutral(what, dtype):
 @context_dependent_memoize
 def get_minmax_kernel(ctx, what, dtype):
     if dtype.kind == "f":
-        reduce_expr = "f%s_nanprop(a,b)" % what
+        reduce_expr = f"f{what}_nanprop(a,b)"
     elif dtype.kind in "iu":
-        reduce_expr = "%s(a,b)" % what
+        reduce_expr = f"{what}(a,b)"
     else:
         raise TypeError("unsupported dtype specified")
 
@@ -673,9 +757,9 @@ def get_minmax_kernel(ctx, what, dtype):
 @context_dependent_memoize
 def get_subset_minmax_kernel(ctx, what, dtype, dtype_subset):
     if dtype.kind == "f":
-        reduce_expr = "f%s(a,b)" % what
+        reduce_expr = f"f{what}(a, b)"
     elif dtype.kind in "iu":
-        reduce_expr = "%s(a,b)" % what
+        reduce_expr = f"{what}(a, b)"
     else:
         raise TypeError("unsupported dtype specified")
 
@@ -684,11 +768,11 @@ def get_subset_minmax_kernel(ctx, what, dtype, dtype_subset):
             reduce_expr=f"{reduce_expr}",
             map_expr="in[lookup_tbl[i]]",
             arguments=(
-                "const %(tp_lut)s *lookup_tbl, "
-                "const %(tp)s *in" % {
-                    "tp": dtype_to_ctype(dtype),
-                    "tp_lut": dtype_to_ctype(dtype_subset),
-                    }),
+                "const {tp_lut} *lookup_tbl, "
+                "const {tp} *in".format(
+                    tp=dtype_to_ctype(dtype),
+                    tp_lut=dtype_to_ctype(dtype_subset),
+                    )),
             preamble=_MINMAX_PREAMBLE)
 
 # }}}

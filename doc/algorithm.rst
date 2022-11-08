@@ -31,50 +31,7 @@ Sums and counts ("reduce")
 
 .. module:: pyopencl.reduction
 
-.. class:: ReductionKernel(ctx, dtype_out, neutral, reduce_expr, map_expr=None, arguments=None, name="reduce_kernel", options=[], preamble="")
-
-    Generate a kernel that takes a number of scalar or vector *arguments*
-    (at least one vector argument), performs the *map_expr* on each entry of
-    the vector argument and then the *reduce_expr* on the outcome of that.
-    *neutral* serves as an initial value. *preamble* offers the possibility
-    to add preprocessor directives and other code (such as helper functions)
-    to be added before the actual reduction kernel code.
-
-    Vectors in *map_expr* should be indexed by the variable *i*. *reduce_expr*
-    uses the formal values "a" and "b" to indicate two operands of a binary
-    reduction operation. If you do not specify a *map_expr*, ``in[i]`` is
-    automatically assumed and treated as the only one input argument.
-
-    *dtype_out* specifies the :class:`numpy.dtype` in which the reduction is
-    performed and in which the result is returned. *neutral* is specified as
-    float or integer formatted as string. *reduce_expr* and *map_expr* are
-    specified as string formatted operations and *arguments* is specified as a
-    string formatted as a C argument list. *name* specifies the name as which
-    the kernel is compiled. *options* are passed unmodified to
-    :meth:`pyopencl.Program.build`. *preamble* specifies a string of code that
-    is inserted before the actual kernels.
-
-    .. method:: __call__(*args, queue=None, wait_for=None, return_event=False, out=None)
-
-        |explain-waitfor|
-
-        With *out* the resulting single-entry :class:`pyopencl.array.Array` can
-        be specified. Because offsets are supported one can store results
-        anywhere (e.g. ``out=a[3]``).
-
-        :return: the resulting scalar as a single-entry :class:`pyopencl.array.Array`
-            if *return_event* is *False*, otherwise a tuple ``(scalar_array, event)``.
-
-        .. note::
-
-            The returned :class:`pyopencl.Event` corresponds only to part of the
-            execution of the reduction. It is not suitable for profiling.
-
-    .. versionadded:: 2011.1
-
-    .. versionchanged:: 2014.2
-
-        Added *out* parameter.
+.. autoclass:: ReductionKernel
 
 Here's a usage example::
 
@@ -117,7 +74,7 @@ difficult to parallelize because of loop-carried dependencies.
 
 .. seealso::
 
-    `Prefix sums and their applications <http://citeseerx.ist.psu.edu/viewdoc/summary?doi=10.1.1.128.6230>`_, by Guy Blelloch.
+    `Prefix sums and their applications <https://doi.org/10.1184/R1/6608579.v1>`__, by Guy Blelloch.
         This article gives an overview of some surprising applications of scans.
 
     :ref:`predefined-scans`
@@ -162,7 +119,7 @@ in PyOpenCL:
 * Segmented scans
 
 * Access to the previous item in *input_expr* (e.g. for comparisons)
-  See the `implementation <https://github.com/inducer/pyopencl/blob/master/pyopencl/scan.py#L1353>`_
+  See the `implementation <https://github.com/inducer/pyopencl/blob/36afe57784368e8d2505bc7cad8df964ba3c0264/pyopencl/algorithm.py#L226>`__
   of :func:`pyopencl.algorithm.unique` for an example.
 
 Making Custom Scan Kernels
@@ -172,29 +129,10 @@ Making Custom Scan Kernels
 
 .. autoclass:: GenericScanKernel
 
-    .. method:: __call__(*args, allocator=None, queue=None, size=None, wait_for=None)
-
-        *queue* and *allocator* default to the ones provided on the first
-        :class:`pyopencl.array.Array` in *args*. *size* may specify the
-        length of the scan to be carried out. If not given, this length
-        is inferred from the first array argument passed.
-
-        |std-enqueue-blurb|
-
-        .. note::
-
-            The returned :class:`pyopencl.Event` corresponds only to part of the
-            execution of the scan. It is not suitable for profiling.
-
 Debugging aids
 ~~~~~~~~~~~~~~
 
-.. class:: GenericDebugScanKernel
-
-    Performs the same function and has the same interface as
-    :class:`GenericScanKernel`, but uses a dead-simple, sequential scan.  Works
-    best on CPU platforms, and helps isolate bugs in scans by removing the
-    potential for issues originating in parallel execution.
+.. autoclass:: GenericDebugScanKernel
 
 .. _predefined-scans:
 
@@ -203,7 +141,8 @@ Simple / Legacy Interface
 
 .. class:: ExclusiveScanKernel(ctx, dtype, scan_expr, neutral, name_prefix="scan", options=[], preamble="", devices=None)
 
-    Generates a kernel that can compute a `prefix sum <https://secure.wikimedia.org/wikipedia/en/wiki/Prefix_sum>`_
+    Generates a kernel that can compute a `prefix sum
+    <https://en.wikipedia.org/wiki/Prefix_sum>`__
     using any associative operation given as *scan_expr*.
     *scan_expr* uses the formal values "a" and "b" to indicate two operands of
     an associative binary operation. *neutral* is the neutral element

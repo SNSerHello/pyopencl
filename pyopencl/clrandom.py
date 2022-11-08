@@ -25,23 +25,23 @@ THE SOFTWARE.
 
 __doc__ = """
 PyOpenCL now includes and uses some of the `Random123 random number generators
-<https://www.deshawresearch.com/resources_random123.html>`_ by D.E. Shaw
-Research.  In addition to being usable through the convenience functions above,
+<https://www.deshawresearch.com/resources.html>`__ by D.E. Shaw
+Research. In addition to being usable through the convenience functions above,
 they are available in any piece of code compiled through PyOpenCL by::
 
     #include <pyopencl-random123/philox.cl>
     #include <pyopencl-random123/threefry.cl>
 
 See the `Philox source
-<https://github.com/inducer/pyopencl/blob/master/pyopencl/cl/pyopencl-random123/philox.cl>`_
+<https://github.com/inducer/pyopencl/blob/main/pyopencl/cl/pyopencl-random123/philox.cl>`__
 and the `Threefry source
-<https://github.com/inducer/pyopencl/blob/master/pyopencl/cl/pyopencl-random123/threefry.cl>`_
+<https://github.com/inducer/pyopencl/blob/main/pyopencl/cl/pyopencl-random123/threefry.cl>`__
 for some documentation if you're planning on using Random123 directly.
 
 .. note::
 
-    PyOpenCL previously had documented support for the `RANLUXCL random number
-    generator <https://bitbucket.org/ivarun/ranluxcl/>`_ by Ivar Ursin
+    PyOpenCL previously had documented support for the RANLUXCL random number
+    generator (``https://bitbucket.org/ivarun/ranluxcl``) by Ivar Ursin
     Nikolaisen. This support is now deprecated because of the general slowness
     of these generators and will be removed from PyOpenCL in the 2018.x series.
     All users are encouraged to switch to one of the Random123 generators,
