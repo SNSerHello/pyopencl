@@ -211,7 +211,7 @@ class VecLookupWarner:
     def __getattr__(self, name):
         warn("pyopencl.array.vec is deprecated. "
              "Please use pyopencl.cltypes for OpenCL vector and scalar types",
-             DeprecationWarning, 2)
+             DeprecationWarning, stacklevel=2)
 
         if name == "types":
             name = "vec_types"
@@ -303,7 +303,7 @@ class DefaultAllocator(cl.tools.DeferredAllocator):
         warn("pyopencl.array.DefaultAllocator is deprecated. "
                 "It will be continue to exist throughout the 2013.x "
                 "versions of PyOpenCL.",
-                DeprecationWarning, 2)
+                DeprecationWarning, stacklevel=2)
         cl.tools.DeferredAllocator.__init__(self, *args, **kwargs)
 
 # }}}
@@ -326,7 +326,7 @@ class ArrayHasOffsetError(ValueError):
         ValueError.__init__(self, val)
 
 
-class _copy_queue:  # noqa
+class _copy_queue:  # noqa: N801
     pass
 
 
@@ -348,7 +348,7 @@ class Array:
     operators and many other niceties) are not desired, pass a
     :class:`~pyopencl.Context`.
 
-    *allocator* may be `None` or a callable that, upon being called with an
+    *allocator* may be *None* or a callable that, upon being called with an
     argument of the number of bytes to be allocated, returns a
     :class:`pyopencl.Buffer` object. (A :class:`pyopencl.tools.MemoryPool`
     instance is one useful example of an object to pass here.)
@@ -419,8 +419,8 @@ class Array:
 
     .. attribute :: flags
 
-        An object with attributes `c_contiguous`, `f_contiguous` and
-        `forc`, which may be used to query contiguity properties in analogy to
+        An object with attributes ``c_contiguous``, ``f_contiguous`` and
+        ``forc``, which may be used to query contiguity properties in analogy to
         :attr:`numpy.ndarray.flags`.
 
     .. rubric:: Methods
@@ -612,15 +612,18 @@ class Array:
 
                 shape = (shape,)
 
-            size = 1
-            for dim in shape:
-                size *= dim
-                if dim < 0:
-                    raise ValueError(
-                        f"negative dimensions are not allowed: {shape}")
+            shape_array = np.array(shape)
 
-            if isinstance(size, np.integer):
-                size = size.item()
+            # Previously, the size was computed as
+            #   "size = 1; size *= dim for dim in shape"
+            # However this can fail when using certain data types,
+            # eg numpy.uint64(1) * 2 returns 2.0 !
+            if np.any(shape_array < 0):
+                raise ValueError(f"negative dimensions are not allowed: {shape}")
+            if np.any([np.array([s]).dtype.kind not in ["u", "i"] for s in shape]):
+                raise ValueError(
+                    "Invalid shape %s ; dimensions, must be integer" % (str(shape)))
+            size = np.prod(shape_array, dtype=np.uint64).item()
 
             if strides is None:
                 if order in "cC":
@@ -891,7 +894,7 @@ class Array:
 
         .. versionchanged:: 2019.1.2
 
-            Calling with `async_=True` was deprecated and replaced by
+            Calling with ``async_=True`` was deprecated and replaced by
             :meth:`get_async`.
             The event returned by :meth:`pyopencl.enqueue_copy` is now stored into
             :attr:`events` to ensure data is not modified before the copy is
@@ -910,10 +913,10 @@ class Array:
         """
 
         if async_:
-            warn("calling pyopencl.Array.get with `async_=True` is deprecated. "
+            warn("calling pyopencl.Array.get with 'async_=True' is deprecated. "
                     "Please use pyopencl.Array.get_async for asynchronous "
                     "device-to-host transfers",
-                    DeprecationWarning, 2)
+                    DeprecationWarning, stacklevel=2)
 
         ary, event1 = self._get(queue=queue, ary=ary, async_=async_, **kwargs)
 
@@ -922,8 +925,8 @@ class Array:
     def get_async(self, queue=None, ary=None, **kwargs):
         """
         Asynchronous version of :meth:`get` which returns a tuple ``(ary, event)``
-        containing the host array `ary`
-        and the :class:`pyopencl.NannyEvent` `event` returned by
+        containing the host array ``ary``
+        and the :class:`pyopencl.NannyEvent` ``event`` returned by
         :meth:`pyopencl.enqueue_copy`.
 
         .. versionadded:: 2019.1.2
@@ -980,8 +983,10 @@ class Array:
         if result[:5] == "array":
             result = f"cl.{type(self).__name__}" + result[5:]
         else:
-            warn(f"{type(result).__name__}.__repr__ was expected to return a "
-                     f"string starting with 'array', got '{result[:10]!r}'")
+            warn(
+                f"{type(result).__name__}.__repr__ was expected to return a "
+                f"string starting with 'array', got '{result[:10]!r}'",
+                stacklevel=2)
 
         return result
 
@@ -1190,7 +1195,7 @@ class Array:
     # {{{ operators
 
     def mul_add(self, selffac, other, otherfac, queue=None):
-        """Return `selffac * self + otherfac*other`.
+        """Return ``selffac * self + otherfac * other``.
         """
         queue = queue or self.queue
 
@@ -1589,7 +1594,7 @@ class Array:
             return TypeError("len() of unsized object")
 
     def __abs__(self):
-        """Return a `Array` of the absolute values of the elements
+        """Return an ``Array`` of the absolute values of the elements
         of *self*.
         """
 
@@ -1912,7 +1917,7 @@ class Array:
         # {{{ determine reshaped strides
 
         # copied and translated from
-        # https://github.com/numpy/numpy/blob/4083883228d61a3b571dec640185b5a5d983bf59/numpy/core/src/multiarray/shape.c  # noqa
+        # https://github.com/numpy/numpy/blob/4083883228d61a3b571dec640185b5a5d983bf59/numpy/core/src/multiarray/shape.c  # noqa: E501
 
         newdims = shape
         newnd = len(newdims)
@@ -2073,7 +2078,7 @@ class Array:
                 strides=tuple(new_strides))
 
     @property
-    def T(self):  # noqa
+    def T(self):  # noqa: N802
         """
         .. versionadded:: 2015.2
         """
@@ -2317,7 +2322,7 @@ def as_strided(ary, shape=None, strides=None):
             data=ary.data, strides=strides)
 
 
-class _same_as_transfer:  # noqa
+class _same_as_transfer:  # noqa: N801
     pass
 
 
@@ -2429,13 +2434,13 @@ def _arange_knl(result, start, step):
 
 def arange(queue, *args, **kwargs):
     """arange(queue, [start, ] stop [, step], **kwargs)
-    Create a :class:`Array` filled with numbers spaced `step` apart,
-    starting from `start` and ending at `stop`. If not given, *start*
+    Create a :class:`Array` filled with numbers spaced *step* apart,
+    starting from *start* and ending at *stop*. If not given, *start*
     defaults to 0, *step* defaults to 1.
 
     For floating point arguments, the length of the result is
-    `ceil((stop - start)/step)`.  This rule may result in the last
-    element of the result being greater than `stop`.
+    ``ceil((stop - start)/step)``.  This rule may result in the last
+    element of the result being greater than *stop*.
 
     *dtype* is a required keyword argument.
 
@@ -2668,9 +2673,9 @@ def multi_take_put(arrays, dest_indices, src_indices, dest_shape=None,
             + builtins.sum((i.events for i in arrays[chunk_slice]), [])
             + builtins.sum((o.events for o in out[chunk_slice]), []))
         evt = knl(queue, gs, ls,
-                *([o for o in out[chunk_slice]]
+                *(list(out[chunk_slice])
                     + [dest_indices, src_indices]
-                    + [i for i in arrays[chunk_slice]]
+                    + list(arrays[chunk_slice])
                     + src_offsets_list[chunk_slice]
                     + [src_indices.size]), wait_for=wait_for_this)
         for o in out[chunk_slice]:
@@ -2746,9 +2751,9 @@ def multi_put(arrays, dest_indices, dest_shape=None, out=None, queue=None,
             + builtins.sum([o.events for o in out[chunk_slice]], []))
         evt = knl(queue, gs, ls,
                 *(
-                    [o for o in out[chunk_slice]]
+                    list(out[chunk_slice])
                     + [dest_indices]
-                    + [i for i in arrays[chunk_slice]]
+                    + list(arrays[chunk_slice])
                     + [use_fill_cla, array_lengths_cla, dest_indices.size]),
                 wait_for=wait_for_this)
 
@@ -3120,6 +3125,102 @@ def minimum(a, b, out=None, queue=None):
             out = b._new_like_me(out_dtype, queue)
 
     out.add_event(_minimum_maximum_backend(out,  a, b, queue=queue, minmax="min"))
+
+    return out
+
+# }}}
+
+
+# {{{ logical ops
+
+def _logical_op(x1, x2, out, operator, queue=None):
+    # NOTE: Copied from pycuda.gpuarray
+    assert operator in ["&&", "||"]
+
+    if np.isscalar(x1) and np.isscalar(x2):
+        if out is None:
+            out = empty(queue, shape=(), dtype=np.int8)
+
+        if operator == "&&":
+            out[:] = np.logical_and(x1, x2)
+        else:
+            out[:] = np.logical_or(x1, x2)
+    elif np.isscalar(x1) or np.isscalar(x2):
+        scalar_arg, = [x for x in (x1, x2) if np.isscalar(x)]
+        ary_arg, = [x for x in (x1, x2) if not np.isscalar(x)]
+        queue = queue or ary_arg.queue
+        allocator = ary_arg.allocator
+
+        if not isinstance(ary_arg, Array):
+            raise ValueError("logical_and can take either scalar or Array"
+                             " as inputs")
+
+        out = out or ary_arg._new_like_me(dtype=np.int8)
+
+        assert out.shape == ary_arg.shape and out.dtype == np.int8
+
+        knl = elementwise.get_array_scalar_binop_kernel(
+            queue.context,
+            operator,
+            out.dtype,
+            ary_arg.dtype,
+            np.dtype(type(scalar_arg))
+        )
+        elwise_kernel_runner(lambda *args, **kwargs: knl)(out, ary_arg, scalar_arg)
+    else:
+        if not (isinstance(x1, Array) and isinstance(x2, Array)):
+            raise ValueError("logical_or/logical_and can take either scalar"
+                             " or Arrays as inputs")
+        if x1.shape != x2.shape:
+            raise NotImplementedError("Broadcasting not supported")
+
+        queue = queue or x1.queue or x2.queue
+        allocator = x1.allocator or x2.allocator
+
+        if out is None:
+            out = empty(queue, allocator=allocator,
+                        shape=x1.shape, dtype=np.int8)
+
+        assert out.shape == x1.shape and out.dtype == np.int8
+
+        knl = elementwise.get_array_binop_kernel(
+            queue.context,
+            operator,
+            out.dtype,
+            x1.dtype, x2.dtype)
+        elwise_kernel_runner(lambda *args, **kwargs: knl)(out, x1, x2)
+
+    return out
+
+
+def logical_and(x1, x2, /, out=None, queue=None):
+    """
+    Returns the element-wise logical AND of *x1* and *x2*.
+    """
+    return _logical_op(x1, x2, out, "&&", queue=queue)
+
+
+def logical_or(x1, x2, /, out=None, queue=None):
+    """
+    Returns the element-wise logical OR of *x1* and *x2*.
+    """
+    return _logical_op(x1, x2, out, "||", queue=queue)
+
+
+def logical_not(x, /, out=None, queue=None):
+    """
+    Returns the element-wise logical NOT of *x*.
+    """
+    if np.isscalar(x):
+        out = out or empty(queue, shape=(), dtype=np.int8)
+        out[:] = np.logical_not(x)
+    else:
+        queue = queue or x.queue
+        out = out or empty(queue, shape=x.shape, dtype=np.int8,
+                           allocator=x.allocator)
+        knl = elementwise.get_logical_not_kernel(queue.context,
+                                                 x.dtype)
+        elwise_kernel_runner(lambda *args, **kwargs: knl)(out, x)
 
     return out
 

@@ -90,12 +90,12 @@ def get_elwise_program(
                 "PYOPENCL_ELWISE_CONTINUE instead.",
                 stacklevel=3)
 
-    source = ("""//CL//
+    source = (f"""//CL//
         {preamble}
 
         #define PYOPENCL_ELWISE_CONTINUE continue
 
-        __kernel void {name}({arguments})
+        __kernel void {name}({", ".join(arg.declarator() for arg in arguments)})
         {{
           int lid = get_local_id(0);
           int gsize = get_global_size(0);
@@ -103,17 +103,10 @@ def get_elwise_program(
           long i;
 
           {loop_prep};
-          {body}
+          {body % {"operation": operation}}
           {after_loop};
         }}
-        """.format(
-            arguments=", ".join(arg.declarator() for arg in arguments),
-            name=name,
-            preamble=preamble,
-            loop_prep=loop_prep,
-            after_loop=after_loop,
-            body=body % dict(operation=operation),
-            ))
+        """)
 
     return cl.Program(context, source).build(options)
 
@@ -216,7 +209,7 @@ class ElementwiseKernel:
     :arg preamble: a piece of C source code that gets inserted outside of the
         function context in the elementwise operation's kernel source code.
 
-    .. warning :: Using a `return` statement in *operation* will lead to
+    .. warning :: Using a ``return`` statement in *operation* will lead to
         incorrect results, as some elements may never get processed. Use
         ``PYOPENCL_ELWISE_CONTINUE`` instead.
 
@@ -256,7 +249,7 @@ class ElementwiseKernel:
                         "that do not have offset support enabled. This usage is "
                         "deprecated. Just pass with_offset=True to VectorArg, "
                         "everything should sort itself out automatically.",
-                        DeprecationWarning)
+                        DeprecationWarning, stacklevel=2)
 
         if not any(isinstance(arg, VectorArg) for arg in arg_descrs):
             raise RuntimeError(
@@ -1157,6 +1150,16 @@ def get_if_positive_kernel(
             ],
             f"result[i] = crit[i] > 0 ? {then_} : {else_}",
             name="if_positive")
+
+
+@context_dependent_memoize
+def get_logical_not_kernel(context, in_dtype):
+    return get_elwise_kernel(context, [
+        VectorArg(np.int8, "z", with_offset=True),
+        VectorArg(in_dtype, "y", with_offset=True),
+        ],
+        "z[i] = (y[i] == 0)",
+        name="logical_not_kernel")
 
 # }}}
 

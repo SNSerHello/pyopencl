@@ -20,11 +20,6 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 """
 
-# avoid spurious: pytest.mark.parametrize is not callable
-# avoid spurious: Module 'scipy.special' has no 'jn' member; maybe 'jv'
-# pylint: disable=not-callable,no-member
-
-
 import math
 import numpy as np
 
@@ -33,9 +28,8 @@ import pytest
 import pyopencl.array as cl_array
 import pyopencl as cl
 import pyopencl.clmath as clmath
-from pyopencl.tools import (  # noqa
-        pytest_generate_tests_for_pyopencl
-        as pytest_generate_tests)
+from pyopencl.tools import (  # noqa: F401
+        pytest_generate_tests_for_pyopencl as pytest_generate_tests)
 from pyopencl.characterize import has_double_support, has_struct_arg_count_bug
 
 try:
@@ -170,12 +164,8 @@ def test_fmod(ctx_factory):
         a2 = cl_array.arange(queue, s, dtype=np.float32)/45.2 + 0.1
         b = clmath.fmod(a, a2)
 
-        a = a.get()
-        a2 = a2.get()
-        b = b.get()
-
-        for i in range(s):
-            assert math.fmod(a[i], a2[i]) == b[i]
+        # https://salsa.debian.org/opencl-team/python-pyopencl/-/merge_requests/3#note_383761
+        assert np.max(np.abs((np.fmod(a.get(), a2.get()) - b.get()))) < 1e-4
 
 
 def test_ldexp(ctx_factory):

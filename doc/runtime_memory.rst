@@ -88,9 +88,9 @@ Buffer
 .. function:: enqueue_fill_buffer(queue, mem, pattern, offset, size, wait_for=None)
 
     :arg mem: the on device :class:`Buffer`
-    :arg pattern: a buffer object (likely a :class:`numpy.ndarray`, eg. `np.uint32(0)`)
-        The memory associated with *pattern* can be reused or freed once the function
-        completes.
+    :arg pattern: a buffer object (likely a :class:`numpy.ndarray`, eg.
+        ``np.uint32(0)``). The memory associated with *pattern* can be reused or
+        freed once the function completes.
     :arg size: The size in bytes of the region to be filled. Must be a multiple of the
         size of the pattern.
     :arg offset: The location in bytes of the region being filled in *mem*.
@@ -289,7 +289,7 @@ Image
     the distance in bytes from one scan line to the next, and from one 2D image
     slice to the next.
 
-    If *hostbuf* is given and *shape* is `None`, then *hostbuf.shape* is
+    If *hostbuf* is given and *shape* is *None*, then *hostbuf.shape* is
     used as the *shape* parameter.
 
     :class:`Image` inherits from :class:`MemoryObject`.
@@ -345,11 +345,11 @@ Image
 
     .. note::
 
-        When reading from the image object, the indices passed to `read_imagef` are
-        in the reverse order from what they would be when accessing *ary* from
+        When reading from the image object, the indices passed to ``read_imagef``
+        are in the reverse order from what they would be when accessing *ary* from
         Python.
 
-    If *norm_int* is `True`, then the integer values are normalized to a floating
+    If *norm_int* is *True*, then the integer values are normalized to a floating
     point scale of 0..1 when read.
 
     .. versionadded:: 2011.2

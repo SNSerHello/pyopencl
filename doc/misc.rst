@@ -29,6 +29,15 @@ Then run::
 You can install these pieces of software in your user account and
 do not need root/administrator privileges.
 
+.. note::
+
+   This installs a conda environment based on Conda Forge. This is not
+   interchangeable with a conda environment based on the (more common)
+   anaconda.  If you have an existing conda environment sitting around, just
+   following the instructions below will likely not work.  Instead, the
+   suggested approach is to create new environment from scratch, starting with
+   miniforge, above.
+
 Enabling access to CPUs and GPUs via (Py)OpenCL
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -50,7 +59,7 @@ On Linux or macOS, type::
     conda install pocl
 
 to install a CPU-based OpenCL driver.
-On macOS, pocl can offer a marked robustness (and, sometimes, performance)
+On macOS, PoCL can offer a marked robustness (and, sometimes, performance)
 improvement over the OpenCL drivers built into the operating system.
 
 On Linux and Windows, you can use Intel's CPU OpenCL runtime::
@@ -105,15 +114,15 @@ qualified path names of the shared library providing the OpenCL driver.
 
     :file:`$CONDA_PREFIX/etc/OpenCL/vendors` (once the Conda environment is activated).
 
-On Linux, if you have other OpenCL drivers installed (such as for your GPU), those will be
-in :file:`/etc/OpenCL/vendors`. You can make them work with PyOpenCL from Conda Forge
-by using the command::
+On Linux, if you have other OpenCL drivers installed (such as for your GPU),
+those will be in :file:`/etc/OpenCL/vendors`. You can make them work with PyOpenCL
+from Conda Forge by using the command::
 
     conda install ocl-icd-system
 
 will make sure these system-wide ICDs are also visible in your conda environment.
-As an alternative, one may manually copy ICD files from :file:`/etc/OpenCL/vendors` into,
-e.g., :file:`$CONDA_PREFIX/etc/OpenCL/vendors`.
+As an alternative, one may manually copy ICD files from :file:`/etc/OpenCL/vendors`
+into, e.g., :file:`$CONDA_PREFIX/etc/OpenCL/vendors`.
 
 If you are looking for more information, see `ocl-icd
 <https://github.com/OCL-dev/ocl-icd>`__ and its documentation. Ocl-icd is the
@@ -154,7 +163,7 @@ You can also install the following CPU based OpenCL implementation using pip
 shipped as binary wheels. Note that pyopencl has to be installed using a wheel
 for pyopencl to recognize these wheels.
 
-To install pyopencl with pocl, a CPU based implementation do::
+To install pyopencl with PoCL, a CPU based implementation do::
 
     pip install pyopencl[pocl]
 
@@ -193,7 +202,7 @@ checking `this file
 <https://github.com/inducer/pyopencl/blob/main/contrib/pyopencl.vim>`__.
 
 Note that the triple-quoted strings containing the source must start with
-`"""//CL// ..."""`.
+``"""//CL// ..."""``.
 
 .. _ipython-integration:
 
@@ -252,7 +261,7 @@ Relation with OpenCL's C Bindings
 We've tried to follow these guidelines when binding the OpenCL's
 C interface to Python:
 
-* Remove the `cl_`, `CL_` and `cl` prefix from data types, macros and
+* Remove the ``cl_``, ``CL_`` and ``cl`` prefix from data types, macros and
   function names.
 * Follow :pep:`8`, i.e.
 
@@ -260,7 +269,7 @@ C interface to Python:
   * If a data type or function name is composed of more than one word,
     separate the words with a single underscore.
 
-* `get_info` functions become attributes.
+* ``get_info`` functions become attributes.
 * Object creation is done by constructors, to the extent possible.
   (i.e. minimize use of "factory functions")
 
@@ -394,7 +403,7 @@ Version 2015.2
 * Rewrite of the wrapper layer to be based on CFFI
 * Pypy compatibility
 * Faster kernel invocation through Python launcher code generation
-* POCL compatibility
+* PoCL compatibility
 
 Version 2015.1
 --------------
@@ -435,14 +444,15 @@ Version 2013.1
 * Clean up the :class:`pyopencl.array.Array` constructor interface.
 * Deprecate ``pyopencl.array.DefaultAllocator``.
 * Deprecate ``pyopencl.tools.CLAllocator``
-* Introduce :class:`pyopencl.tools.DeferredAllocator`, :class:`pyopencl.tools.ImmediateAllocator`.
+* Introduce :class:`pyopencl.tools.DeferredAllocator`,
+  :class:`pyopencl.tools.ImmediateAllocator`.
 * Allow arrays whose beginning does not coincide with the beginning of their
   :attr:`pyopencl.array.Array.data` :class:`pyopencl.Buffer`.
   See :attr:`pyopencl.array.Array.base_data` and :attr:`pyopencl.array.Array.offset`.
   Note that not all functions in PyOpenCL support such arrays just yet. These
   will fail with :exc:`pyopencl.array.ArrayHasOffsetError`.
-* Add :meth:`pyopencl.array.Array.__getitem__` and :meth:`pyopencl.array.Array.__setitem__`,
-  supporting generic slicing.
+* Add :meth:`pyopencl.array.Array.__getitem__` and
+  :meth:`pyopencl.array.Array.__setitem__`, supporting generic slicing.
 
   It is *possible* to create non-contiguous arrays using this functionality.
   Most operations (elementwise etc.) will not work on such arrays.
@@ -451,7 +461,8 @@ Version 2013.1
   arrays that start past the beginning of the original array will fail for now.
   This will be fixed in a future release.
 
-* :class:`pyopencl.CommandQueue` may be used as a context manager (in a ``with`` statement)
+* :class:`pyopencl.CommandQueue` may be used as a context manager (in a
+  ``with`` statement)
 * Add :func:`pyopencl.clmath.atan2`, :func:`pyopencl.clmath.atan2pi`.
 * Add :func:`pyopencl.array.concatenate`.
 * Add :meth:`pyopencl.Kernel.capture_call`.
@@ -505,8 +516,8 @@ Version 2011.2
 * All comparable PyOpenCL objects are now also hashable.
 * Add ``pyopencl.tools.context_dependent_memoize`` to the documented
   functionality.
-* Base :mod:`pyopencl.clrandom` on RANLUXCL (``https://bitbucket.org/ivarun/ranluxcl>``),
-  add functionality.
+* Base :mod:`pyopencl.clrandom` on RANLUXCL
+  (``https://bitbucket.org/ivarun/ranluxcl>``), add functionality.
 * Add :class:`pyopencl.NannyEvent` objects.
 * Add :mod:`pyopencl.characterize`.
 * Ensure compatibility with OS X Lion.
@@ -628,15 +639,15 @@ Version 0.91
 
 * Add :ref:`gl-interop`.
 * Add a test suite.
-* Fix numerous `get_info` bugs. (reports by David Garcia and the test suite)
+* Fix numerous ``get_info`` bugs. (reports by David Garcia and the test suite)
 * Add :meth:`pyopencl.ImageFormat.__repr__`.
 * Add :meth:`pyopencl.addressing_mode.to_string` and colleagues.
-* The `pitch` arguments to
+* The ``pitch`` arguments to
   ``pyopencl.create_image_2d``,
   ``pyopencl.create_image_3d``,
   ``pyopencl.enqueue_read_image``, and
   ``pyopencl.enqueue_write_image``
-  are now defaulted to zero. The argument order of `enqueue_{read,write}_image`
+  are now defaulted to zero. The argument order of ``enqueue_{read,write}_image``
   has changed for this reason.
 * Deprecate
   ``pyopencl.create_image_2d``,
@@ -653,7 +664,8 @@ Version 0.91
 * :meth:`pyopencl.Image.get_image_info` now actually exists.
 * Add :attr:`pyopencl.Image.info`.
 * Fix API tracing.
-* Add constructor arguments to :class:`pyopencl.ImageFormat`.  (suggested by David Garcia)
+* Add constructor arguments to :class:`pyopencl.ImageFormat`.
+  (suggested by David Garcia)
 
 Version 0.90.4
 --------------

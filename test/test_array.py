@@ -22,12 +22,10 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 """
 
-# avoid spurious: pytest.mark.parametrize is not callable
-# pylint: disable=not-callable
-
 import numpy as np
 import numpy.linalg as la
 import sys
+from itertools import product
 
 import pytest
 
@@ -35,7 +33,7 @@ import pyopencl as cl
 import pyopencl.array as cl_array
 import pyopencl.cltypes as cltypes
 import pyopencl.tools as cl_tools
-from pyopencl.tools import (  # noqa
+from pyopencl.tools import (  # noqa: F401
         pytest_generate_tests_for_pyopencl as pytest_generate_tests)
 from pyopencl.characterize import has_double_support, has_struct_arg_count_bug
 
@@ -840,8 +838,8 @@ def test_random_float_in_range(ctx_factory, rng_class, ary_size, plot_hist=False
     if device.platform.vendor == "The pocl project" \
             and device.type & cl.device_type.GPU \
             and rng_class is RanluxGenerator:
-        pytest.xfail("ranlux test fails on POCL + Nvidia,"
-                "at least the Titan V, as of pocl 1.6, 2021-01-20")
+        pytest.xfail("ranlux test fails on PoCL + Nvidia,"
+                "at least the Titan V, as of PoCL 1.6, 2021-01-20")
 
     if device.platform.vendor == "Intel(R) Corporation" \
             and rng_class is RanluxGenerator:
@@ -907,8 +905,8 @@ def test_random_int_in_range(ctx_factory, rng_class, dtype, plot_hist=False):
     if queue.device.platform.vendor == "The pocl project" \
             and queue.device.type & cl.device_type.GPU \
             and rng_class is RanluxGenerator:
-        pytest.xfail("ranlux test fails on POCL + Nvidia,"
-                "at least the Titan V, as of pocl 1.6, 2021-01-20")
+        pytest.xfail("ranlux test fails on PoCL + Nvidia,"
+                "at least the Titan V, as of PoCL 1.6, 2021-01-20")
 
     if rng_class is RanluxGenerator:
         gen = rng_class(queue, 5120)
@@ -953,6 +951,33 @@ def test_numpy_integer_shape(ctx_factory):
 
     cl_array.empty(queue, np.int32(17), np.float32)
     cl_array.empty(queue, (np.int32(17), np.int32(17)), np.float32)
+
+# }}}
+
+
+# {{{ test_allocation_with_various_shape_scalar_types
+
+def test_allocation_with_various_shape_scalar_types(ctx_factory):
+    context = ctx_factory()
+    queue = cl.CommandQueue(context)
+
+    dims_ok = (2, np.int32(7), np.uint64(1))
+    dims_not_ok = (-1, 5.70, np.float32(7))
+
+    shapes_ok_1d = list(product(dims_ok))
+    shapes_ok_2d = list(product(dims_ok, dims_ok))
+    shapes_ok_3d = list(product(dims_ok, dims_ok, dims_ok))
+
+    shapes_not_ok_1d = list(product(dims_not_ok))
+    shapes_not_ok_2d = list(product(dims_ok, dims_not_ok))
+    shapes_not_ok_3d = list(product(dims_not_ok, dims_not_ok, dims_not_ok))
+
+    for shape in shapes_ok_1d + shapes_ok_2d + shapes_ok_3d:
+        cl_array.empty(queue, shape, np.float32)
+
+    for shape in shapes_not_ok_1d + shapes_not_ok_2d + shapes_not_ok_3d:
+        with pytest.raises(ValueError):
+            cl_array.empty(queue, shape, np.float32)
 
 # }}}
 
@@ -1431,7 +1456,8 @@ def test_skip_slicing(ctx_factory):
     a = cl_array.to_device(queue, a_host)
     b = a[::3]
     assert b.shape == b_host.shape
-    assert np.array_equal(b[1].get(), b_host[1])  # noqa pylint:disable=unsubscriptable-object
+    # pylint:disable=unsubscriptable-object
+    assert np.array_equal(b[1].get(), b_host[1])
 
 # }}}
 
@@ -1613,8 +1639,8 @@ def test_get_async(ctx_factory):
     device = queue.device
     if device.platform.vendor == "The pocl project" \
             and device.type & cl.device_type.GPU:
-        pytest.xfail("the async get test fails on POCL + Nvidia,"
-                "at least the K40, as of pocl 1.6, 2021-01-20")
+        pytest.xfail("the async get test fails on PoCL + Nvidia,"
+                "at least the K40, as of PoCL 1.6, 2021-01-20")
 
     rng = np.random.default_rng(seed=42)
     a = rng.random(10**6, dtype=np.float32)
@@ -2268,6 +2294,60 @@ def test_arrays_with_svm_allocators(ctx_factory, use_mempool):
         # operating on the memory
 
 # }}}
+
+
+def test_logical_and_or(ctx_factory):
+    # NOTE: Copied over from pycuda/test/test_gpuarray.py
+    rng = np.random.default_rng(seed=0)
+    ctx = ctx_factory()
+    cq = cl.CommandQueue(ctx)
+
+    for op in ["logical_and", "logical_or"]:
+        x_np = rng.random((10, 4))
+        y_np = rng.random((10, 4))
+        zeros_np = np.zeros((10, 4))
+        ones_np = np.ones((10, 4))
+
+        x_cl = cl_array.to_device(cq, x_np)
+        y_cl = cl_array.to_device(cq, y_np)
+        zeros_cl = cl_array.zeros(cq, (10, 4), np.float64)
+        ones_cl = cl_array.zeros(cq, (10, 4), np.float64) + 1
+
+        np.testing.assert_array_equal(
+            getattr(cl_array, op)(x_cl, y_cl).get(),
+            getattr(np, op)(x_np, y_np))
+        np.testing.assert_array_equal(
+            getattr(cl_array, op)(x_cl, ones_cl).get(),
+            getattr(np, op)(x_np, ones_np))
+        np.testing.assert_array_equal(
+            getattr(cl_array, op)(x_cl, zeros_cl).get(),
+            getattr(np, op)(x_np, zeros_np))
+        np.testing.assert_array_equal(
+            getattr(cl_array, op)(x_cl, 1.0).get(),
+            getattr(np, op)(x_np, ones_np))
+        np.testing.assert_array_equal(
+            getattr(cl_array, op)(x_cl, 0.0).get(),
+            getattr(np, op)(x_np, 0.0))
+
+
+def test_logical_not(ctx_factory):
+    # NOTE: Copied over from pycuda/test/test_gpuarray.py
+    ctx = ctx_factory()
+    cq = cl.CommandQueue(ctx)
+
+    rng = np.random.default_rng(seed=0)
+    x_np = rng.random((10, 4))
+    x_cl = cl_array.to_device(cq, x_np)
+
+    np.testing.assert_array_equal(
+        cl_array.logical_not(x_cl).get(),
+        np.logical_not(x_np))
+    np.testing.assert_array_equal(
+        cl_array.logical_not(cl_array.zeros(cq, 10, np.float64)).get(),
+        np.logical_not(np.zeros(10)))
+    np.testing.assert_array_equal(
+        cl_array.logical_not((cl_array.zeros(cq, 10, np.float64) + 1)).get(),
+        np.logical_not(np.ones(10)))
 
 
 if __name__ == "__main__":

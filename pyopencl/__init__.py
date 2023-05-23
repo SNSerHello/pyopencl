@@ -24,7 +24,7 @@ from sys import intern
 from warnings import warn
 from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 
-from pyopencl.version import VERSION, VERSION_STATUS, VERSION_TEXT  # noqa
+from pyopencl.version import VERSION, VERSION_STATUS, VERSION_TEXT  # noqa: F401
 
 # must import, otherwise dtype registry will not be fully populated
 import pyopencl.cltypes  # noqa: F401
@@ -44,8 +44,10 @@ try:
 except ImportError:
     from os.path import dirname, join, realpath
     if realpath(join(os.getcwd(), "pyopencl")) == realpath(dirname(__file__)):
-        warn("It looks like you are importing PyOpenCL from "
-                "its source directory. This likely won't work.")
+        warn(
+            "It looks like you are importing PyOpenCL from "
+            "its source directory. This likely won't work.",
+            stacklevel=2)
     raise
 
 import numpy as np
@@ -173,17 +175,17 @@ except ImportError:
 
 if not _PYPY:
     # FIXME: Add back to default set when pypy support catches up
-    from pyopencl._cl import (  # noqa
+    from pyopencl._cl import (  # noqa: F401
         enqueue_map_buffer,
         enqueue_map_image,
         )
 
 if get_cl_header_version() >= (1, 1):
-    from pyopencl._cl import (  # noqa
+    from pyopencl._cl import (  # noqa: F401
         UserEvent,
         )
 if get_cl_header_version() >= (1, 2):
-    from pyopencl._cl import (  # noqa
+    from pyopencl._cl import (  # noqa: F401
         _enqueue_marker_with_wait_list,
         _enqueue_barrier_with_wait_list,
 
@@ -198,14 +200,14 @@ if get_cl_header_version() >= (1, 2):
         )
 
 if get_cl_header_version() >= (2, 0):
-    from pyopencl._cl import (  # noqa
+    from pyopencl._cl import (  # noqa: F401
         SVMPointer,
         SVM,
         SVMAllocation,
         )
 
 if _cl.have_gl():
-    from pyopencl._cl import (  # noqa
+    from pyopencl._cl import (  # noqa: F401
         gl_object_type,
         gl_texture_info,
 
@@ -215,12 +217,12 @@ if _cl.have_gl():
         )
 
     try:
-        from pyopencl._cl import get_apple_cgl_share_group  # noqa
+        from pyopencl._cl import get_apple_cgl_share_group  # noqa: F401
     except ImportError:
         pass
 
     try:
-        from pyopencl._cl import (  # noqa
+        from pyopencl._cl import (  # noqa: F401
             enqueue_acquire_gl_objects,
             enqueue_release_gl_objects,
         )
@@ -265,11 +267,11 @@ class CommandQueueUsedAfterExit(UserWarning):
 
 def compiler_output(text):
     if int(os.environ.get("PYOPENCL_COMPILER_OUTPUT", "0")):
-        warn(text, CompilerWarning)
+        warn(text, CompilerWarning, stacklevel=3)
     else:
         warn("Non-empty compiler output encountered. Set the "
                 "environment variable PYOPENCL_COMPILER_OUTPUT=1 "
-                "to see more.", CompilerWarning)
+                "to see more.", CompilerWarning, stacklevel=3)
 
 # }}}
 
@@ -386,8 +388,8 @@ def enable_debugging(platform_or_context):
                 ["-g", "-O0"])
         os.environ["CPU_MAX_COMPUTE_UNITS"] = "1"
     else:
-        warn("do not know how to enable debugging on '%s'"
-                % platform.name)
+        warn(f"Do not know how to enable debugging on '{platform.name}'",
+             stacklevel=2)
 
 
 class Program:
@@ -967,7 +969,8 @@ def _add_functionality():
 
         if hostbuf is not None and not \
                 (flags & (mem_flags.USE_HOST_PTR | mem_flags.COPY_HOST_PTR)):
-            warn("'hostbuf' was passed, but no memory flags to make use of it.")
+            warn("'hostbuf' was passed, but no memory flags to make use of it.",
+                 stacklevel=2)
 
         if hostbuf is None and pitches is not None:
             raise Error("'pitches' may only be given if 'hostbuf' is given")
@@ -1039,8 +1042,9 @@ def _add_functionality():
 
     class _ImageInfoGetter:
         def __init__(self, event):
-            warn("Image.image.attr is deprecated and will go away in 2021. "
-                    "Use Image.attr directly, instead.")
+            warn(
+                "Image.image.attr is deprecated and will go away in 2021. "
+                "Use Image.attr directly, instead.", stacklevel=2)
 
             self.event = event
 
@@ -2171,8 +2175,10 @@ def enqueue_barrier(queue, wait_for=None):
 
 def enqueue_fill_buffer(queue, mem, pattern, offset, size, wait_for=None):
     if not (queue._get_cl_version() >= (1, 2) and get_cl_header_version() >= (1, 2)):
-        warn("The context for this queue does not declare OpenCL 1.2 support, so "
-                "the next thing you might see is a crash")
+        warn(
+            "The context for this queue does not declare OpenCL 1.2 support, so "
+            "the next thing you might see is a crash",
+            stacklevel=2)
 
     if _PYPY and isinstance(pattern, np.generic):
         pattern = np.asarray(pattern)

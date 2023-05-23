@@ -139,7 +139,7 @@ from pytools.persistent_dict import KeyBuilder as KeyBuilderBase
 
 import re
 
-from pyopencl.compyte.dtypes import (  # noqa
+from pyopencl.compyte.dtypes import (  # noqa: F401
         get_or_register_dtype, TypeNameNotKnown,
         register_dtype, dtype_to_ctype)
 
@@ -159,14 +159,14 @@ _register_types()
 
 # {{{ imported names
 
-from pyopencl._cl import (  # noqa
+from pyopencl._cl import (  # noqa: F401
         PooledBuffer, AllocatorBase, DeferredAllocator,
         ImmediateAllocator, MemoryPool,
         )
 
 
 if get_cl_header_version() >= (2, 0):
-    from pyopencl._cl import (  # noqa
+    from pyopencl._cl import (  # noqa: F401
             SVMPool,
             PooledSVM,
             SVMAllocator,
@@ -235,6 +235,7 @@ _MEMPOOL_IFACE_DOCS = """
 
 
 def _monkeypatch_docstrings():
+    from pytools.codegen import remove_common_indentation
 
     PooledBuffer.__doc__ = """
     An object representing a :class:`MemoryPool`-based allocation of
@@ -315,7 +316,7 @@ def _monkeypatch_docstrings():
 
     # {{{ MemoryPool
 
-    MemoryPool.__doc__ = """
+    MemoryPool.__doc__ = remove_common_indentation("""
     A memory pool for OpenCL device memory in :class:`pyopencl.Buffer` form.
     *allocator* must be an instance of one of the above classes, and should be
     an :class:`ImmediateAllocator`.  The memory pool assumes that allocation
@@ -340,7 +341,7 @@ def _monkeypatch_docstrings():
         Synonym for :meth:`allocate` to match :class:`AllocatorBase`.
 
         .. versionadded:: 2011.2
-    """ + _MEMPOOL_IFACE_DOCS
+    """) + _MEMPOOL_IFACE_DOCS
 
     # }}}
 
@@ -349,6 +350,8 @@ _monkeypatch_docstrings()
 
 
 def _monkeypatch_svm_docstrings():
+    from pytools.codegen import remove_common_indentation
+
     # {{{ PooledSVM
 
     PooledSVM.__doc__ = """
@@ -380,7 +383,7 @@ def _monkeypatch_svm_docstrings():
 
     .. automethod:: enqueue_release
 
-        Synonymous to :meth;`release`, for consistency with
+        Synonymous to :meth:`release`, for consistency with
         :class:`~pyopencl.SVMAllocation`. Note that, unlike
         :meth:`pyopencl.SVMAllocation.enqueue_release`, specifying a queue
         or events to be waited for is not supported.
@@ -430,7 +433,7 @@ def _monkeypatch_svm_docstrings():
 
     # {{{ SVMPool
 
-    SVMPool.__doc__ = """
+    SVMPool.__doc__ = remove_common_indentation("""
     A memory pool for OpenCL device memory in :ref:`SVM <svm>` form.
     *allocator* must be an instance of :class:`SVMAllocator`.
 
@@ -440,7 +443,7 @@ def _monkeypatch_svm_docstrings():
     .. automethod:: __call__
 
         Return a :class:`PooledSVM` of the given *size*.
-    """ + _MEMPOOL_IFACE_DOCS
+    """) + _MEMPOOL_IFACE_DOCS
 
     # }}}
 
@@ -660,9 +663,9 @@ def get_pyopencl_fixture_arg_names(metafunc, extra_arg_names=None):
 
         if arg == "ctx_getter":
             from warnings import warn
-            warn("The 'ctx_getter' arg is deprecated in "
-                    "favor of 'ctx_factory'.",
-                    DeprecationWarning)
+            warn(
+                "The 'ctx_getter' arg is deprecated in favor of 'ctx_factory'.",
+                DeprecationWarning, stacklevel=2)
 
         arg_names.append(arg)
 
@@ -900,9 +903,9 @@ def get_arg_offset_adjuster_code(arg_types):
             result.append("__global %(type)s *%(name)s = "
                     "(__global %(type)s *) "
                     "((__global char *) %(name)s__base + %(name)s__offset);"
-                    % dict(
-                        type=dtype_to_ctype(arg_type.dtype),
-                        name=arg_type.name))
+                    % {
+                        "type": dtype_to_ctype(arg_type.dtype),
+                        "name": arg_type.name})
 
     return "\n".join(result)
 
@@ -955,7 +958,7 @@ class _CDeclList:
     def add_dtype(self, dtype):
         dtype = np.dtype(dtype)
 
-        if dtype in [np.float64 or np.complex128]:
+        if dtype in (np.float64, np.complex128):
             self.saw_double = True
 
         if dtype.kind == "c":
@@ -988,7 +991,7 @@ class _CDeclList:
     def visit_arguments(self, arguments):
         for arg in arguments:
             dtype = arg.dtype
-            if dtype in [np.float64 or np.complex128]:
+            if dtype in (np.float64, np.complex128):
                 self.saw_double = True
 
             if dtype.kind == "c":
@@ -1017,8 +1020,8 @@ class _CDeclList:
 
 @memoize
 def match_dtype_to_c_struct(device, name, dtype, context=None):
-    """Return a tuple `(dtype, c_decl)` such that the C struct declaration
-    in `c_decl` and the structure :class:`numpy.dtype` instance `dtype`
+    """Return a tuple ``(dtype, c_decl)`` such that the C struct declaration
+    in ``c_decl`` and the structure :class:`numpy.dtype` instance ``dtype``
     have the same memory layout.
 
     Note that *dtype* may be modified from the value that was passed in,
@@ -1049,7 +1052,7 @@ def match_dtype_to_c_struct(device, name, dtype, context=None):
         >>> cl.tools.get_or_register_dtype('id_val', dtype)
 
     As this example shows, it is important to call
-    :func:`get_or_register_dtype` on the modified `dtype` returned by this
+    :func:`get_or_register_dtype` on the modified ``dtype`` returned by this
     function, not the original one.
     """
 
@@ -1094,26 +1097,22 @@ def match_dtype_to_c_struct(device, name, dtype, context=None):
             "result[%d] = pycl_offsetof(%s, %s);" % (i+1, name, field_name)
             for i, (field_name, _) in enumerate(fields))
 
-    src = r"""
+    src = rf"""
         #define pycl_offsetof(st, m) \
                  ((uint) ((__local char *) &(dummy.m) \
                  - (__local char *)&dummy ))
 
-        %(pre_decls)s
+        {pre_decls}
 
-        %(my_decl)s
+        {c_decl}
 
         __kernel void get_size_and_offsets(__global uint *result)
-        {
-            result[0] = sizeof(%(my_type)s);
-            __local %(my_type)s dummy;
-            %(offset_code)s
-        }
-    """ % dict(
-            pre_decls=pre_decls,
-            my_decl=c_decl,
-            my_type=name,
-            offset_code=offset_code)
+        {{
+            result[0] = sizeof({name});
+            __local {name} dummy;
+            {offset_code}
+        }}
+    """
 
     if context is None:
         context = cl.Context([device])
@@ -1123,7 +1122,7 @@ def match_dtype_to_c_struct(device, name, dtype, context=None):
     prg = cl.Program(context, src)
     knl = prg.build(devices=[device]).get_size_and_offsets
 
-    import pyopencl.array  # noqa
+    import pyopencl.array  # noqa: F401
     result_buf = cl.array.empty(queue, 1+len(fields), np.uint32)
     knl(queue, (1,), (1,), result_buf.data)
     queue.finish()

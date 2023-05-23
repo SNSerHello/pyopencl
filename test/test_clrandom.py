@@ -20,18 +20,14 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 """
 
-# avoid spurious: pytest.mark.parametrize is not callable
-# pylint: disable=not-callable
-
 import numpy as np
 import pytest
 
 import pyopencl as cl
 import pyopencl.cltypes as cltypes
 import pyopencl.clrandom as clrandom
-from pyopencl.tools import (  # noqa
-        pytest_generate_tests_for_pyopencl
-        as pytest_generate_tests)
+from pyopencl.tools import (  # noqa: F401
+        pytest_generate_tests_for_pyopencl as pytest_generate_tests)
 from pyopencl.characterize import has_double_support
 
 try:
@@ -73,8 +69,8 @@ def test_clrandom_dtypes(ctx_factory, rng_class, dtype):
         if device.platform.vendor == "The pocl project" \
                 and device.type & cl.device_type.GPU \
                 and rng_class is make_ranlux_generator:
-            pytest.xfail("ranlux test fails on POCL + Nvidia,"
-                    "at least the K40, as of pocl 1.6, 2021-01-20")
+            pytest.xfail("ranlux test fails on PoCL + Nvidia,"
+                    "at least the K40, as of PoCL 1.6, 2021-01-20")
 
         rng.uniform(queue, size, dtype)
 

@@ -20,9 +20,6 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 """
 
-# avoid spurious: pytest.mark.parametrize is not callable
-# pylint: disable=not-callable
-
 import numpy as np
 import numpy.linalg as la
 import sys
@@ -32,8 +29,8 @@ from test_array import general_clrand
 import pytest
 
 import pyopencl as cl
-import pyopencl.array as cl_array  # noqa
-from pyopencl.tools import (  # noqa
+import pyopencl.array
+from pyopencl.tools import (  # noqa: F401
         pytest_generate_tests_for_pyopencl as pytest_generate_tests)
 from pyopencl.characterize import has_double_support, has_struct_arg_count_bug
 from pyopencl.scan import (InclusiveScanKernel, ExclusiveScanKernel,
@@ -58,7 +55,7 @@ def test_elwise_kernel(ctx_factory):
             "z[i] = a*x[i] + b*y[i]",
             "linear_combination")
 
-    c_gpu = cl_array.empty_like(a_gpu)
+    c_gpu = cl.array.empty_like(a_gpu)
     lin_comb(5, a_gpu, 6, b_gpu, c_gpu)
 
     assert la.norm((c_gpu - (5 * a_gpu + 6 * b_gpu)).get()) < 1e-5
@@ -87,7 +84,7 @@ def test_elwise_kernel_with_options(ctx_factory):
         options=options,
         )
 
-    out_gpu = cl_array.empty_like(in_gpu)
+    out_gpu = cl.array.empty_like(in_gpu)
     add_one(out_gpu, in_gpu)
 
     gt = in_gpu.get() + 1
@@ -110,7 +107,7 @@ def test_ranged_elwise_kernel(ctx_factory):
             slice(1000, -1),
             ]):
 
-        a_gpu = cl_array.zeros(queue, (50000,), dtype=np.float32)
+        a_gpu = cl.array.zeros(queue, (50000,), dtype=np.float32)
         a_cpu = np.zeros(a_gpu.shape, a_gpu.dtype)
 
         a_cpu[slc] = 7
@@ -123,9 +120,9 @@ def test_take(ctx_factory):
     context = ctx_factory()
     queue = cl.CommandQueue(context)
 
-    idx = cl_array.arange(queue, 0, 200000, 2, dtype=np.uint32)
-    a = cl_array.arange(queue, 0, 600000, 3, dtype=np.float32)
-    result = cl_array.take(a, idx)
+    idx = cl.array.arange(queue, 0, 200000, 2, dtype=np.uint32)
+    a = cl.array.arange(queue, 0, 600000, 3, dtype=np.float32)
+    result = cl.array.take(a, idx)
     assert ((3 * idx).get() == result.get()).all()
 
 
@@ -134,7 +131,7 @@ def test_arange(ctx_factory):
     queue = cl.CommandQueue(context)
 
     n = 5000
-    a = cl_array.arange(queue, n, dtype=np.float32)
+    a = cl.array.arange(queue, n, dtype=np.float32)
     assert (np.arange(n, dtype=np.float32) == a.get()).all()
 
 
@@ -144,7 +141,7 @@ def test_reverse(ctx_factory):
 
     n = 5000
     a = np.arange(n).astype(np.float32)
-    a_gpu = cl_array.to_device(queue, a)
+    a_gpu = cl.array.to_device(queue, a)
 
     a_gpu = a_gpu.reverse()
 
@@ -163,8 +160,8 @@ def test_if_positive(ctx_factory):
     a = a_gpu.get()
     b = b_gpu.get()
 
-    max_a_b_gpu = cl_array.maximum(a_gpu, b_gpu)
-    min_a_b_gpu = cl_array.minimum(a_gpu, b_gpu)
+    max_a_b_gpu = cl.array.maximum(a_gpu, b_gpu)
+    min_a_b_gpu = cl.array.minimum(a_gpu, b_gpu)
 
     print(max_a_b_gpu)
     print(np.maximum(a, b))
@@ -179,14 +176,14 @@ def test_take_put(ctx_factory):
 
     for n in [5, 17, 333]:
         one_field_size = 8
-        buf_gpu = cl_array.zeros(queue,
+        buf_gpu = cl.array.zeros(queue,
                 n * one_field_size, dtype=np.float32)
-        dest_indices = cl_array.to_device(queue,
+        dest_indices = cl.array.to_device(queue,
                 np.array([0, 1, 2,  3, 32, 33, 34, 35], dtype=np.uint32))
-        read_map = cl_array.to_device(queue,
+        read_map = cl.array.to_device(queue,
                 np.array([7, 6, 5, 4, 3, 2, 1, 0], dtype=np.uint32))
 
-        cl_array.multi_take_put(
+        cl.array.multi_take_put(
                 arrays=[buf_gpu for i in range(n)],
                 dest_indices=dest_indices,
                 src_indices=read_map,
@@ -254,10 +251,10 @@ def test_sum(ctx_factory):
                 ref_divisor = 1
 
             if slc.step is None:
-                sum_a_gpu = cl_array.sum(a_gpu[slc]).get()
+                sum_a_gpu = cl.array.sum(a_gpu[slc]).get()
                 assert abs(sum_a_gpu - sum_a) / ref_divisor < 1e-4
 
-            sum_a_gpu_2 = cl_array.sum(a_gpu, slice=slc).get()
+            sum_a_gpu_2 = cl.array.sum(a_gpu, slice=slc).get()
             assert abs(sum_a_gpu_2 - sum_a) / ref_divisor < 1e-4
 
 
@@ -291,8 +288,8 @@ def test_reduction_not_first_argument(ctx_factory):
     queue = cl.CommandQueue(context)
 
     n = 400
-    a = cl_array.arange(queue, n, dtype=np.float32)
-    b = cl_array.arange(queue, n, dtype=np.float32)
+    a = cl.array.arange(queue, n, dtype=np.float32)
+    b = cl.array.arange(queue, n, dtype=np.float32)
 
     from pyopencl.reduction import ReductionKernel
     krnl = ReductionKernel(context, np.float32, neutral="0",
@@ -324,7 +321,7 @@ def test_minmax(ctx_factory):
             a = a_gpu.get()
 
             op_a = getattr(np, what)(a)
-            op_a_gpu = getattr(cl_array, what)(a_gpu).get()
+            op_a_gpu = getattr(cl.array, what)(a_gpu).get()
 
             assert op_a_gpu == op_a, (op_a_gpu, op_a, dtype, what)
 
@@ -351,7 +348,7 @@ def test_subset_minmax(ctx_factory):
         a_gpu = clrand(queue, (l_a,), dtype)
         a = a_gpu.get()
 
-        meaningful_indices_gpu = cl_array.zeros(
+        meaningful_indices_gpu = cl.array.zeros(
                 queue, l_m, dtype=np.int32)
         meaningful_indices = meaningful_indices_gpu.get()
         j = 0
@@ -361,12 +358,12 @@ def test_subset_minmax(ctx_factory):
             if j % gran == 0:
                 j = j + 1
 
-        meaningful_indices_gpu = cl_array.to_device(
+        meaningful_indices_gpu = cl.array.to_device(
                 queue, meaningful_indices)
         b = a[meaningful_indices]
 
         min_a = np.min(b)
-        min_a_gpu = cl_array.subset_min(meaningful_indices_gpu, a_gpu).get()
+        min_a_gpu = cl.array.subset_min(meaningful_indices_gpu, a_gpu).get()
 
         assert min_a_gpu == min_a
 
@@ -396,7 +393,7 @@ def test_dot(ctx_factory):
             b = b_gpu.get()
 
             dot_ab = np.dot(a, b)
-            dot_ab_gpu = cl_array.dot(a_gpu, b_gpu).get()
+            dot_ab_gpu = cl.array.dot(a_gpu, b_gpu).get()
 
             assert abs(dot_ab_gpu - dot_ab) / abs(dot_ab) < 1e-4
 
@@ -411,7 +408,7 @@ def test_dot(ctx_factory):
                 else:
                     raise
 
-            vdot_ab_gpu = cl_array.vdot(a_gpu, b_gpu).get()
+            vdot_ab_gpu = cl.array.vdot(a_gpu, b_gpu).get()
 
             rel_err = abs(vdot_ab_gpu - vdot_ab) / abs(vdot_ab)
             assert rel_err < 1e-4, rel_err
@@ -574,7 +571,7 @@ def test_scan(ctx_factory, dtype, scan_cls):
     rng = np.random.default_rng(seed=42)
     for n in scan_test_counts:
         host_data = rng.integers(0, 10, n, dtype=dtype)
-        dev_data = cl_array.to_device(queue, host_data)
+        dev_data = cl.array.to_device(queue, host_data)
 
         # /!\ fails on Nv GT2?? for some drivers
         assert (host_data == dev_data.get()).all()
@@ -693,7 +690,7 @@ def test_unique(ctx_factory):
         a_dev = clrand(queue, (n,), dtype=np.int32, a=0, b=1000)
         a = a_dev.get()
         a = np.sort(a)
-        a_dev = cl_array.to_device(queue, a)
+        a_dev = cl.array.to_device(queue, a)
 
         a_unique_host = np.unique(a)
 
@@ -731,7 +728,7 @@ def test_index_preservation(ctx_factory):
                         out[i] = item;
                         """)
 
-            out = cl_array.empty(queue, n, dtype=np.int32)
+            out = cl.array.empty(queue, n, dtype=np.int32)
             knl(out)
 
             assert (out.get() == np.arange(n)).all()
@@ -796,7 +793,7 @@ def test_segmented_scan(ctx_factory):
 
                 seg_boundary_flags = np.zeros(n, dtype=np.uint8)
                 seg_boundary_flags[seg_boundaries] = 1
-                seg_boundary_flags_dev = cl_array.to_device(
+                seg_boundary_flags_dev = cl.array.to_device(
                         queue, seg_boundary_flags)
 
                 seg_boundaries.insert(0, 0)
@@ -818,7 +815,7 @@ def test_segmented_scan(ctx_factory):
 
                 #print "REF", result_host
 
-                result_dev = cl_array.empty_like(a_dev)
+                result_dev = cl.array.empty_like(a_dev)
                 knl(a_dev, seg_boundary_flags_dev, result_dev)
 
                 #print "RES", result_dev
@@ -1035,7 +1032,7 @@ def test_key_value_sorter(ctx_factory):
     starts = starts.get()
     lists = lists.get()
 
-    mydict = dict()
+    mydict = {}
     for k, v in zip(keys.get(), values.get()):
         mydict.setdefault(k, []).append(v)
 
@@ -1070,14 +1067,13 @@ def test_bitonic_sort(ctx_factory, size, dtype):
     if (dev.platform.name == "Portable Computing Language"
             and dtype == np.float64
             and get_pocl_version(dev.platform) < (1, 0)):
-        pytest.xfail("Double precision bitonic sort doesn't work on POCL < 1.0")
+        pytest.xfail("Double precision bitonic sort doesn't work on PoCL < 1.0")
 
     if dtype == np.float64 and not has_double_support(dev):
         from pytest import skip
         skip("double precision not supported on %s" % dev)
-    if dev.platform.name == "Intel(R) OpenCL":
-        pytest.skip("Fails to compile on Intel because of "
-                "https://github.com/intel/llvm/issues/6607")
+    # Requires https://github.com/intel/llvm/releases/tag/2022-WW50 or newer to pass
+    # on Intel CL.
 
     import pyopencl.clrandom as clrandom
     from pyopencl.bitonic_sort import BitonicSort
@@ -1121,23 +1117,22 @@ def test_bitonic_argsort(ctx_factory, size, dtype):
     device = queue.device
     if device.platform.vendor == "The pocl project" \
             and device.type & cl.device_type.GPU:
-        pytest.xfail("bitonic argsort fails on POCL + Nvidia,"
-                "at least the K40, as of pocl 1.6, 2021-01-20")
-    if device.platform.name == "Intel(R) OpenCL":
-        pytest.skip("Fails to compile on Intel because of "
-                "https://github.com/intel/llvm/issues/6607")
+        pytest.xfail("bitonic argsort fails on PoCL + Nvidia,"
+                "at least the K40, as of PoCL 1.6, 2021-01-20")
+    # Requires https://github.com/intel/llvm/releases/tag/2022-WW50 or newer to pass
+    # on Intel CL.
 
     dev = ctx.devices[0]
     if (dev.platform.name == "Portable Computing Language"
             and sys.platform == "darwin"):
-        pytest.xfail("Bitonic sort crashes on Apple POCL")
+        pytest.xfail("Bitonic sort crashes on Apple PoCL")
     if (dev.platform.name == "Apple" and dev.type & cl.device_type.CPU):
         pytest.xfail("Bitonic sort won't work on Apple CPU: no workgroup "
             "parallelism")
     if (dev.platform.name == "Portable Computing Language"
             and dtype == np.float64
             and get_pocl_version(dev.platform) < (1, 0)):
-        pytest.xfail("Double precision bitonic sort doesn't work on POCL < 1.0")
+        pytest.xfail("Double precision bitonic sort doesn't work on PoCL < 1.0")
     if (dev.platform.name == "Intel(R) OpenCL" and size == 0):
         pytest.xfail("size-0 arange fails on Intel CL")
 
@@ -1148,13 +1143,13 @@ def test_bitonic_argsort(ctx_factory, size, dtype):
     import pyopencl.clrandom as clrandom
     from pyopencl.bitonic_sort import BitonicSort
 
-    index = cl_array.arange(queue, 0, size, 1, dtype=np.int32)
+    index = cl.array.arange(queue, 0, size, 1, dtype=np.int32)
     m = clrandom.rand(queue, (size,), dtype, luxury=None, a=0, b=239432234)
 
     sorterm = BitonicSort(ctx)
 
     ms = m.copy()
-    # enqueue_marker crashes under CL 1.1 pocl if there is anything to wait for
+    # enqueue_marker crashes under CL 1.1 PoCL if there is anything to wait for
     # (no clEnqueueWaitForEvents) https://github.com/inducer/pyopencl/pull/237
     if (dev.platform.name == "Portable Computing Language"
             and cl.get_cl_header_version() < (1, 2)):

@@ -26,7 +26,7 @@ import pyopencl as cl
 import pyopencl.cltypes as cltypes
 import pyopencl.tools as cl_tools
 from pyopencl import mem_flags
-from pyopencl.tools import (  # noqa
+from pyopencl.tools import (  # noqa: F401
         pytest_generate_tests_for_pyopencl as pytest_generate_tests)
 
 
@@ -92,7 +92,6 @@ def test_struct_with_array_fields(ctx_factory):
 
 
 if __name__ == "__main__":
-
     import sys
     if len(sys.argv) > 1:
         exec(sys.argv[1])

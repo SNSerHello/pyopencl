@@ -20,10 +20,6 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 """
 
-# avoid spurious: pytest.mark.parametrize is not callable
-# pylint: disable=not-callable
-
-
 import numpy as np
 import numpy.linalg as la
 import pytest
@@ -32,21 +28,13 @@ import pyopencl as cl
 import pyopencl.array as cl_array
 import pyopencl.cltypes as cltypes
 import pyopencl.clrandom
-from pyopencl.tools import (  # noqa
+from pyopencl.tools import (  # noqa: F401
         pytest_generate_tests_for_pyopencl as pytest_generate_tests,
         ImmediateAllocator, DeferredAllocator)
 from pyopencl.characterize import get_pocl_version
 
-# Are CL implementations crashy? You be the judge. :)
-try:
-    import faulthandler  # noqa
-except ImportError:
-    pass
-else:
-    faulthandler.enable()
 
-
-def _xfail_if_pocl(plat, up_to_version, msg="unsupported by pocl"):
+def _xfail_if_pocl(plat, up_to_version, msg="unsupported by PoCL"):
     if plat.vendor == "The pocl project":
         if up_to_version is None or get_pocl_version(plat) <= up_to_version:
             pytest.xfail(msg)
@@ -55,8 +43,8 @@ def _xfail_if_pocl(plat, up_to_version, msg="unsupported by pocl"):
 def _xfail_if_pocl_gpu(device, what):
     if device.platform.vendor == "The pocl project" \
             and device.type & cl.device_type.GPU:
-        pytest.xfail(f"POCL's {what} support don't work right on Nvidia GPUs, "
-                "at least the Titan V, as of pocl 1.6, 2021-01-20")
+        pytest.xfail(f"PoCL's {what} support don't work right on Nvidia GPUs, "
+                "at least the Titan V, as of PoCL 1.6, 2021-01-20")
 
 
 # {{{ test_get_info
@@ -81,7 +69,7 @@ def test_get_info(ctx_factory):
             (cl.Program, cl.program_info.KERNEL_NAMES),
             (cl.Program, cl.program_info.NUM_KERNELS),
         ])
-    CRASH_QUIRKS = [  # noqa
+    CRASH_QUIRKS = [  # noqa: N806
             (("NVIDIA Corporation", "NVIDIA CUDA",
                 "OpenCL 1.0 CUDA 3.0.1"),
                 [
@@ -116,7 +104,7 @@ def test_get_info(ctx_factory):
                     (cl.Program, cl.program_info.SOURCE),
                     ]),
             ]
-    QUIRKS = []  # noqa
+    QUIRKS = []  # noqa: N806
 
     def find_quirk(quirk_list, cl_obj, info):
         for (vendor, name, version), quirks in quirk_list:
@@ -422,7 +410,7 @@ def test_image_2d(ctx_factory):
     if "Intel" in device.vendor and "31360.31426" in device.version:
         from pytest import skip
         skip("images crashy on %s" % device)
-    _xfail_if_pocl(device.platform, None, "pocl does not support CL_ADDRESS_CLAMP")
+    _xfail_if_pocl(device.platform, None, "PoCL does not support CL_ADDRESS_CLAMP")
 
     prg = cl.Program(context, """
         __kernel void copy_image(
@@ -500,7 +488,7 @@ def test_image_3d(ctx_factory):
     if device.platform.vendor == "Intel(R) Corporation":
         from pytest import skip
         skip("images crashy on %s" % device)
-    _xfail_if_pocl(device.platform, None, "pocl does not support CL_ADDRESS_CLAMP")
+    _xfail_if_pocl(device.platform, None, "PoCL does not support CL_ADDRESS_CLAMP")
 
     prg = cl.Program(context, """
         __kernel void copy_image_plane(
@@ -766,9 +754,9 @@ def test_can_build_and_run_binary(ctx_factory):
 
 def test_enqueue_barrier_marker(ctx_factory):
     ctx = ctx_factory()
-    # Still relevant on pocl 1.0RC1.
+    # Still relevant on PoCL 1.0RC1.
     _xfail_if_pocl(
-            ctx.devices[0].platform, (1, 0), "pocl crashes on enqueue_barrier")
+            ctx.devices[0].platform, (1, 0), "PoCL crashes on enqueue_barrier")
 
     queue = cl.CommandQueue(ctx)
 
@@ -803,7 +791,7 @@ def test_unload_compiler(platform):
             or cl.get_cl_header_version() < (1, 2)):
         from pytest import skip
         skip("clUnloadPlatformCompiler is only available in OpenCL 1.2")
-    _xfail_if_pocl(platform, (0, 13), "pocl does not support unloading compiler")
+    _xfail_if_pocl(platform, (0, 13), "PoCL does not support unloading compiler")
     if platform.vendor == "Intel(R) Corporation":
         from pytest import skip
         skip("Intel proprietary driver does not support unloading compiler")
@@ -853,7 +841,7 @@ def test_user_event(ctx_factory):
 
     # https://github.com/pocl/pocl/issues/201
     _xfail_if_pocl(ctx.devices[0].platform, (0, 13),
-            "pocl's user events don't work right")
+            "PoCL's user events don't work right")
 
     status = {}
 
@@ -1150,7 +1138,7 @@ def test_coarse_grain_svm(ctx_factory, use_opaque_style):
     if (dev.platform.vendor == "The pocl project"
             and dev.type & cl.device_type.GPU
             and "k40" in dev.name.lower()):
-        pytest.xfail("Crashes on K40s via POCL-CUDA")
+        pytest.xfail("Crashes on K40s via PoCL-CUDA")
 
     dtype = np.dtype(np.float32)
     n = 3000
@@ -1524,9 +1512,6 @@ def test_enqueue_copy_array_2(ctx_factory):
 
 
 if __name__ == "__main__":
-    # make sure that import failures get reported, instead of skipping the tests.
-    import pyopencl  # noqa
-
     import sys
     if len(sys.argv) > 1:
         exec(sys.argv[1])

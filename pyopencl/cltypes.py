@@ -23,7 +23,9 @@ from pyopencl.tools import get_or_register_dtype
 import warnings
 
 if __file__.endswith("array.py"):
-    warnings.warn("pyopencl.array.vec is deprecated. Please use pyopencl.cltypes")
+    warnings.warn(
+        "pyopencl.array.vec is deprecated. Please use pyopencl.cltypes.",
+        stacklevel=2)
 
 """
 This file provides a type mapping from OpenCl type names to their numpy equivalents
@@ -77,10 +79,10 @@ def _create_vector_types():
                 titles.extend((len(names) - len(titles)) * [None])
 
             try:
-                dtype = np.dtype(dict(
-                    names=names,
-                    formats=[base_type] * padded_count,
-                    titles=titles))
+                dtype = np.dtype({
+                    "names": names,
+                    "formats": [base_type] * padded_count,
+                    "titles": titles})
             except NotImplementedError:
                 try:
                     dtype = np.dtype([((n, title), base_type)
@@ -98,11 +100,14 @@ def _create_vector_types():
                     from warnings import warn
                     warn("default values for make_xxx are deprecated;"
                          " instead specify all parameters or use"
-                         " cltypes.zeros_xxx", DeprecationWarning)
+                         " cltypes.zeros_xxx",
+                         DeprecationWarning, stacklevel=4)
+
                 padded_args = tuple(list(args) + [0] * (padded_count - len(args)))
                 array = eval("array(padded_args, dtype=dtype)",
-                             dict(array=np.array, padded_args=padded_args,
-                                  dtype=dtype))
+                             {"array": np.array,
+                              "padded_args": padded_args,
+                              "dtype": dtype})
                 for key, val in list(kwargs.items()):
                     array[key] = val
                 return array
@@ -110,7 +115,7 @@ def _create_vector_types():
             set_global("make_" + name, eval(
                 "lambda *args, **kwargs: create_array(dtype, %i, %i, "
                 "*args, **kwargs)" % (count, padded_count),
-                dict(create_array=create_array, dtype=dtype)))
+                {"create_array": create_array, "dtype": dtype}))
             set_global("filled_" + name, eval(
                 "lambda val: make_%s(*[val]*%i)" % (name, count)))
             set_global("zeros_" + name, eval("lambda: filled_%s(0)" % (name)))
